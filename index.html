@@ -293,7 +293,13 @@ Promise.all([fetch(ACS_URL).then(r=>r.json()), fetch(TIGER_URL).then(r=>r.json()
       const county = r[idx["county"]];
       const tract = r[idx["tract"]];
       const k = county + "-" + tract;
-      const num = (v) => { const n = +v; return isFinite(n) && v !== null && v !== "" && n > -1e9 ? n : null; };
+      // Census uses -666666666, -888888888, -555555555, etc. as suppression sentinels.
+      const num = (v) => {
+        if (v == null || v === "") return null;
+        const n = +v;
+        if (!isFinite(n) || n < 0) return null;
+        return n;
+      };
 
       const pop = num(r[idx["B01001_001E"]]);
       const pop25 = num(r[idx["B15003_001E"]]);
@@ -447,7 +453,8 @@ function buildTooltip(k, d, m) {
     <div class="${ok?'matched':'unmatched'}">${ok ? '✓ Matches filters' : '✗ Excluded: ' + m.reasons.join(', ')}</div>
     <div class="stat"><span>Population</span><span>${fmtNum(d.pop)}</span></div>
     <div class="stat"><span>Households</span><span>${fmtNum(d.hh)}</span></div>
-    <div class="stat"><span>Median HH income</span><span>${fmtUSD(d.medInc)}</span></div>
+    <div class="stat"><span>Median HH income</span><span>${fmtUSD(d.medInc)}${d.medInc==null && d.pcInc!=null ? ' <span style="color:#888;font-weight:400">(suppressed)</span>' : ''}</span></div>
+    <div class="stat"><span>Per capita income</span><span>${fmtUSD(d.pcInc)}</span></div>
     <div class="stat"><span>Median age</span><span>${d.medAge??'—'}</span></div>
     <div class="stat"><span>Bachelor's+</span><span>${fmtPct(d.bachPct)}</span></div>
     <div class="stat"><span>Homeowners</span><span>${fmtPct(d.ownPct)}</span></div>
