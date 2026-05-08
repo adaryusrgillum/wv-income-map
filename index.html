@@ -2,14 +2,24 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>WV Audience Targeting — Census-driven</title>
+<title>AdvertiseWV — Audience Targeting</title>
+<link rel="icon" href="logo.png">
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   :root {
-    --bg:#f6f7f9; --panel:#fff; --border:#e3e6eb; --text:#1d2433;
-    --muted:#5b6473; --accent:#2563eb; --accent-2:#0ea5a4;
-    --good:#16a34a; --warn:#d97706; --bad:#dc2626;
+    --bg:#2b3134;            /* deep slate (logo backdrop, darkened) */
+    --panel:#363d40;         /* sidebar */
+    --panel-2:#2f3538;       /* nested cards */
+    --border:#4a5256;
+    --text:#f3ecd5;          /* warm cream */
+    --text-bright:#ffffff;
+    --muted:#9ea7a6;
+    --accent:#f2c200;        /* logo gold */
+    --accent-2:#fbcf2e;      /* lighter gold */
+    --accent-dim:#8a6f00;    /* darker gold */
+    --good:#f2c200;          /* matched = gold */
+    --bad:#a3a3a3;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; font-family: -apple-system, Segoe UI, Roboto, sans-serif; color: var(--text); background: var(--bg); }
@@ -18,61 +28,89 @@
     background: var(--panel); border-right: 1px solid var(--border);
     overflow-y: auto; padding: 16px; font-size: 13px;
   }
-  aside h1 { font-size: 18px; margin: 0 0 4px 0; }
-  aside h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 18px 0 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; }
+  .logo-wrap {
+    text-align: center; padding: 6px 0 14px;
+    border-bottom: 1px solid var(--border); margin-bottom: 14px;
+  }
+  .logo-wrap img { max-width: 100%; height: auto; max-height: 180px; filter: drop-shadow(0 0 18px rgba(242,194,0,0.35)); }
+  aside h1 { font-size: 18px; margin: 0 0 4px 0; color: var(--text-bright); letter-spacing: .02em; }
+  aside h1 .gold { color: var(--accent); }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); margin: 18px 0 6px; border-bottom: 1px solid var(--border); padding-bottom: 4px; font-weight: 700; }
   aside p.sub { margin: 0 0 12px 0; color: var(--muted); font-size: 12px; }
-  #map { position: relative; height: 100vh; }
+  #map { position: relative; height: 100vh; background: #1c2123; }
   #status {
     position: absolute; top: 10px; left: 10px; z-index: 1000;
-    background: rgba(255,255,255,0.95); padding: 8px 12px; border-radius: 6px;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.15); font-size: 12px;
+    background: var(--panel); color: var(--text); padding: 8px 12px;
+    border: 1px solid var(--accent); border-radius: 6px;
+    box-shadow: 0 0 20px rgba(242,194,0,0.25); font-size: 12px;
   }
   #summary {
-    background: linear-gradient(135deg, #1e3a8a, #0ea5a4); color: #fff;
-    border-radius: 8px; padding: 12px; margin-bottom: 8px;
+    background: linear-gradient(135deg, #1c2225 0%, #2f3538 100%);
+    border: 1px solid var(--accent); color: var(--text-bright);
+    border-radius: 8px; padding: 14px; margin-bottom: 8px;
+    box-shadow: 0 0 24px rgba(242,194,0,0.18);
   }
-  #summary .big { font-size: 22px; font-weight: 700; line-height: 1.1; }
-  #summary .row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 12px; opacity: .92; }
-  #summary .row b { font-size: 14px; }
+  #summary .big { font-size: 26px; font-weight: 700; line-height: 1.05; color: var(--accent); }
+  #summary .row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 12px; color: var(--muted); }
+  #summary .row b { font-size: 13px; color: var(--text-bright); }
   .preset-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .preset {
-    background: #eef2ff; color: #1e3a8a; border: 1px solid #c7d2fe;
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
     border-radius: 6px; padding: 8px 10px; font-size: 12px;
     cursor: pointer; text-align: left; line-height: 1.25;
+    transition: all .15s;
   }
-  .preset:hover { background: #c7d2fe; }
-  .preset.active { background: var(--accent); color: #fff; border-color: var(--accent); }
-  .preset .pname { font-weight: 600; display: block; }
-  .preset .psub { font-size: 11px; opacity: .85; }
+  .preset:hover { background: #424a4d; border-color: var(--accent); }
+  .preset.active { background: var(--accent); color: #1c2123; border-color: var(--accent-2); box-shadow: 0 0 14px rgba(242,194,0,0.4); }
+  .preset.active .psub { color: #4a3700; }
+  .preset .pname { font-weight: 600; display: block; color: var(--text-bright); }
+  .preset.active .pname { color: #1c2123; }
+  .preset .psub { font-size: 11px; color: var(--muted); }
   .filter { margin: 10px 0; }
   .filter label { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
-  .filter label b { color: var(--text); }
-  .filter input[type=range] { width: 100%; }
+  .filter label b { color: var(--accent); font-weight: 600; }
+  .filter input[type=range] { width: 100%; accent-color: var(--accent); }
   .dual { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   button.reset {
-    background: #f3f4f6; border: 1px solid var(--border); padding: 6px 10px;
-    border-radius: 6px; font-size: 12px; cursor: pointer; color: var(--muted);
+    background: transparent; border: 1px solid var(--accent); padding: 4px 10px;
+    border-radius: 6px; font-size: 11px; cursor: pointer; color: var(--accent);
   }
-  button.reset:hover { background: #e5e7eb; }
-  .legend { background: rgba(255,255,255,0.95); padding: 8px 12px; border-radius: 6px; box-shadow: 0 1px 4px rgba(0,0,0,0.15); font-size: 12px; position: absolute; bottom: 24px; right: 10px; z-index: 1000; }
+  button.reset:hover { background: var(--accent); color: #1c2123; }
+  .legend {
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border);
+    padding: 8px 12px; border-radius: 6px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.4);
+    font-size: 12px; position: absolute; bottom: 24px; right: 10px; z-index: 1000;
+  }
   .legend .row { display: flex; align-items: center; margin: 2px 0; }
-  .legend .sw { width: 14px; height: 14px; margin-right: 6px; border: 1px solid #555; border-radius: 2px; }
+  .legend .sw { width: 14px; height: 14px; margin-right: 6px; border: 1px solid var(--border); border-radius: 2px; }
   .tooltip-box { font-size: 12px; line-height: 1.4; min-width: 220px; }
   .tooltip-box b { font-size: 13px; }
   .tooltip-box .stat { display: flex; justify-content: space-between; }
-  .tooltip-box .stat span:last-child { font-weight: 600; color: var(--accent); }
-  .tooltip-box .matched { color: var(--good); font-weight: 600; }
-  .tooltip-box .unmatched { color: var(--bad); }
-  .toplist { font-size: 11px; max-height: 180px; overflow-y: auto; }
-  .toplist .item { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px dashed var(--border); }
-  .footer { font-size: 11px; color: var(--muted); margin-top: 18px; }
+  .tooltip-box .stat span:last-child { font-weight: 600; color: #b8860b; }
+  .tooltip-box .matched { color: #b8860b; font-weight: 600; }
+  .tooltip-box .unmatched { color: #888; }
+  .toplist { font-size: 11px; max-height: 180px; overflow-y: auto; background: var(--panel-2); border-radius: 4px; padding: 4px 8px; }
+  .toplist .item { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px dashed var(--border); color: var(--text); }
+  .toplist .item span:last-child { color: var(--accent); font-weight: 600; }
+  .footer { font-size: 11px; color: var(--muted); margin-top: 18px; line-height: 1.5; }
   .footer a { color: var(--accent); text-decoration: none; }
+  .footer b { color: var(--text-bright); }
+  /* Custom Leaflet popups to match dark theme */
+  .leaflet-tooltip { background: var(--panel) !important; color: var(--text) !important; border: 1px solid var(--accent) !important; box-shadow: 0 2px 10px rgba(0,0,0,0.4) !important; }
+  .leaflet-tooltip-top:before { border-top-color: var(--accent) !important; }
+  .leaflet-control-attribution { background: rgba(43,49,52,0.85) !important; color: var(--muted) !important; }
+  .leaflet-control-attribution a { color: var(--accent) !important; }
 </style>
 </head>
 <body>
 
 <aside>
-  <h1>WV Audience Targeting</h1>
+  <div class="logo-wrap">
+    <img src="logo.png" alt="AdvertiseWV — Digital Marketing">
+  </div>
+  <h1>Audience <span class="gold">Targeting</span></h1>
   <p class="sub">Build ad audiences across West Virginia's 547 census tracts using ACS 2023 demographics. Filters update the map and audience size live.</p>
 
   <div id="summary">
@@ -165,9 +203,9 @@
   <div id="status">Loading ACS variables &amp; tract boundaries…</div>
   <div class="legend">
     <div style="font-weight:600;margin-bottom:4px;">Tract status</div>
-    <div class="row"><div class="sw" style="background:#16a34a"></div>Matches all filters</div>
-    <div class="row"><div class="sw" style="background:#fbbf24;opacity:.5"></div>No data</div>
-    <div class="row"><div class="sw" style="background:#9ca3af;opacity:.35"></div>Excluded</div>
+    <div class="row"><div class="sw" style="background:#f2c200"></div>Matches all filters</div>
+    <div class="row"><div class="sw" style="background:#94a3b8;opacity:.5"></div>No data</div>
+    <div class="row"><div class="sw" style="background:#475055"></div>Excluded</div>
   </div>
 </div>
 
@@ -206,7 +244,7 @@ const COUNTY_NAMES = {
 
 const DATA = {};
 const map = L.map('map').setView([38.7, -80.5], 7);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
   attribution: '&copy; OSM &copy; CARTO | ACS 2023 5-yr | TIGERweb',
   maxZoom: 19
 }).addTo(map);
@@ -322,9 +360,9 @@ function renderMap(geo) {
 }
 
 function tractStyleFor(d, m) {
-  if (!d) return { fillColor: "#fbbf24", fillOpacity: 0.5, color:"#444", weight:0.6 };
-  if (m && m.ok) return { fillColor: "#16a34a", fillOpacity: 0.75, color:"#065f46", weight:0.8 };
-  return { fillColor: "#9ca3af", fillOpacity: 0.25, color:"#666", weight:0.4 };
+  if (!d) return { fillColor: "#94a3b8", fillOpacity: 0.35, color:"#64748b", weight:0.4 };
+  if (m && m.ok) return { fillColor: "#f2c200", fillOpacity: 0.82, color:"#8a6f00", weight:0.9 };
+  return { fillColor: "#475055", fillOpacity: 0.25, color:"#5a6266", weight:0.4 };
 }
 function applyTractStyle(lyr) {
   lyr.setStyle(tractStyleFor(DATA[lyr._key], lyr._matchInfo));
